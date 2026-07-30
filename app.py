@@ -1632,89 +1632,67 @@ The six tracked sources produced **{TRACKED_HISTORICAL_POLICIES} total closed po
 # SOURCE DETAILS
 # =====================================================
 
-with st.expander("Source-level forecast and historical performance"):
-    st.write("**Projected lead plan**")
-    source_plan_display = source_plan.copy()
-    for column in [
-        "Historical Monthly Leads",
-        "Expected Incremental Monthly Leads",
-        "Expected Monthly Leads",
-        "Expected Forecast-Period Leads",
-        "Incremental Monthly Budget",
-    ]:
-        source_plan_display[column] = source_plan_display[column].round(1)
-    source_plan_display["Incremental Budget Share"] = (
-        source_plan_display["Incremental Budget Share"] * 100
-    ).round(1)
-    source_plan_display = source_plan_display.rename(
-        columns={
-            "Incremental Budget Share": "Incremental Budget Share (%)",
-            "Incremental Monthly Budget": "Incremental Monthly Budget ($)",
-        }
+with st.expander("Source Details"):
+    st.caption(
+        "This compact table shows the few source-level figures needed to explain "
+        "the forecast. Intermediate quote and close calculations are already "
+        "included in the final vehicle estimate."
     )
-    st.dataframe(source_plan_display, use_container_width=True, hide_index=True)
 
-    st.write("**Tracked-source production forecast**")
-    source_forecast_display = source_summary[
+    source_details = source_plan[
         [
             "Source",
-            "Category",
-            "Expected Leads",
-            "Expected Quotes",
-            "Expected Closed Policies",
-            "Expected Auto Policies",
-            "Expected Vehicle Items",
-            "Incremental Forecast-Period Cost",
+            "Historical Monthly Leads",
+            "Expected Monthly Leads",
+            "Incremental Monthly Budget",
         ]
-    ].copy()
-    number_columns = [
-        "Expected Leads",
-        "Expected Quotes",
-        "Expected Closed Policies",
-        "Expected Auto Policies",
-        "Expected Vehicle Items",
-        "Incremental Forecast-Period Cost",
-    ]
-    source_forecast_display[number_columns] = source_forecast_display[
-        number_columns
+    ].merge(
+        source_summary[["Source", "Expected Vehicle Items"]],
+        on="Source",
+        how="left",
+    )
+
+    source_type_lookup = {
+        "EverQuote": "Adjustable paid",
+        "Smart Financial": "Adjustable paid",
+        "Insurance Quotes": "Adjustable paid",
+        "StateFarm.com": "Fixed",
+        "Referrals": "Natural",
+        "Winbacks": "Natural",
+    }
+    source_details.insert(
+        1,
+        "Source Type",
+        source_details["Source"].map(source_type_lookup),
+    )
+
+    source_details["Historical Monthly Leads"] = source_details[
+        "Historical Monthly Leads"
     ].round(1)
+    source_details["Expected Monthly Leads"] = source_details[
+        "Expected Monthly Leads"
+    ].round(1)
+    source_details["Expected Vehicle Items"] = source_details[
+        "Expected Vehicle Items"
+    ].round(1)
+    source_details["Incremental Monthly Budget"] = source_details[
+        "Incremental Monthly Budget"
+    ].round(2)
+
+    source_details = source_details.rename(
+        columns={
+            "Historical Monthly Leads": "Historical Leads per Month",
+            "Expected Monthly Leads": "Forecast Leads per Month",
+            "Expected Vehicle Items": "Expected Vehicle Items",
+            "Incremental Monthly Budget": "Additional Monthly Budget ($)",
+        }
+    )
+
     st.dataframe(
-        source_forecast_display,
+        source_details,
         use_container_width=True,
         hide_index=True,
     )
-
-    st.write("**Historical lead-source performance**")
-    historical_display = sources[
-        [
-            "Source",
-            "Category",
-            "Historical Leads",
-            "Historical Quotes",
-            "Closed Policies",
-            "Cost Per Lead",
-            "Quote Rate",
-            "Quote-to-Close Rate",
-            "Lead-to-Close Rate",
-        ]
-    ].copy()
-    for rate_column in [
-        "Quote Rate",
-        "Quote-to-Close Rate",
-        "Lead-to-Close Rate",
-    ]:
-        historical_display[rate_column] = (
-            historical_display[rate_column] * 100
-        ).round(1)
-    historical_display = historical_display.rename(
-        columns={
-            "Cost Per Lead": "Cost Per Lead ($)",
-            "Quote Rate": "Quote Rate (%)",
-            "Quote-to-Close Rate": "Quote-to-Close Rate (%)",
-            "Lead-to-Close Rate": "Lead-to-Close Rate (%)",
-        }
-    )
-    st.dataframe(historical_display, use_container_width=True, hide_index=True)
 
 
 # =====================================================
@@ -1770,8 +1748,8 @@ The 121 tracked closed policies include both policy types. The model estimates t
 **Not all agency production is tied to the six tracked sources.**  
 The six tracked sources produced 121 total policies, while the agency produced {HISTORICAL_TOTAL_POLICIES} total policies. The remaining production is represented as “other agency production” and is assumed to continue near its historical pace.
 
-**The full $3,600 baseline budget is not mapped to provider records.**  
-The three adjustable paid sources explain about **${PAID_PROVIDER_RECORDED_MONTHLY_COST:,.0f} per month** from their recorded lead counts and costs. About **${UNMAPPED_MONTHLY_BUDGET:,.0f} per month** is not assigned to those three records. For that reason, the model treats $3,600 as the established baseline and uses cost per lead only for spending above it.
+**The complete baseline budget is not mapped to provider records.**  
+The established monthly budget is **3,600 dollars**. The three adjustable paid sources explain about **{PAID_PROVIDER_RECORDED_MONTHLY_COST:,.0f} dollars per month** from their recorded lead counts and costs. About **{UNMAPPED_MONTHLY_BUDGET:,.0f} dollars per month** is not assigned to those three records. For that reason, the model treats 3,600 dollars as the established baseline and uses cost per lead only for spending above it.
 
 **Only three sources grow when the budget grows.**  
 Additional spending purchases leads only from EverQuote, Smart Financial, and Insurance Quotes. StateFarm, referrals, winbacks, and other agency production remain at their fixed or historical pace.
