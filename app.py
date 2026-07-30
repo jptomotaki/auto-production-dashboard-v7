@@ -1432,6 +1432,140 @@ else:
     )
 
 
+
+# =====================================================
+# SOURCE ROI / COST-EFFICIENCY RANKING
+# =====================================================
+
+st.subheader("Lead-Source ROI Ranking")
+
+st.caption(
+    "A true dollar ROI cannot be calculated because policy revenue and commission "
+    "were not provided. This ranking uses a practical ROI proxy: expected vehicle "
+    "items produced per $1,000 of recorded lead cost. Historical direct cost per "
+    "closed policy is calculated as total recorded source cost divided by historical "
+    "closed policies; it does not include payroll, overhead, or other operating costs."
+)
+
+roi_ranking = sources.copy()
+roi_ranking["Historical Direct Cost per Close"] = np.where(
+    roi_ranking["Closed Policies"] > 0,
+    (
+        roi_ranking["Historical Leads"]
+        * roi_ranking["Cost Per Lead"]
+        / roi_ranking["Closed Policies"]
+    ),
+    np.nan,
+)
+roi_ranking["Vehicle Items per $1,000"] = np.where(
+    roi_ranking["Cost Per Lead"] > 0,
+    (
+        roi_ranking["Lead-to-Close Rate"]
+        * AUTO_POLICY_SHARE
+        * VEHICLES_PER_AUTO_POLICY
+        / roi_ranking["Cost Per Lead"]
+        * 1000
+    ),
+    np.inf,
+)
+
+roi_type_lookup = {
+    "EverQuote": "Adjustable paid source",
+    "Smart Financial": "Adjustable paid source",
+    "Insurance Quotes": "Adjustable paid source",
+    "StateFarm.com": "Fixed-volume source",
+    "Referrals": "Naturally generated source",
+    "Winbacks": "Naturally generated source",
+}
+
+roi_explanation_lookup = {
+    "StateFarm.com": (
+        "No direct lead cost is recorded, so it is highly cost-efficient, "
+        "but its monthly volume is limited."
+    ),
+    "Winbacks": (
+        "Strong historical closing performance and a low recorded cost, "
+        "but the supply of winbacks is naturally limited."
+    ),
+    "Referrals": (
+        "The strongest historical close rate with a low recorded cost, "
+        "but referrals cannot simply be purchased in larger quantities."
+    ),
+    "EverQuote": (
+        "The strongest purchasable paid source because its historical close rate "
+        "offsets its moderate cost per lead."
+    ),
+    "Smart Financial": (
+        "Its cost per lead is low, but its historical close rate was weaker than "
+        "EverQuote's."
+    ),
+    "Insurance Quotes": (
+        "Its historical conversion was reasonable, but the highest cost per lead "
+        "reduces its cost efficiency."
+    ),
+}
+
+roi_ranking["Source Type"] = roi_ranking["Source"].map(roi_type_lookup)
+roi_ranking["Short Explanation"] = roi_ranking["Source"].map(
+    roi_explanation_lookup
+)
+roi_ranking = roi_ranking.sort_values(
+    "Vehicle Items per $1,000",
+    ascending=False,
+).reset_index(drop=True)
+roi_ranking.insert(0, "Rank", np.arange(1, len(roi_ranking) + 1))
+
+roi_ranking["ROI Proxy"] = roi_ranking.apply(
+    lambda row: (
+        "No direct lead cost"
+        if row["Cost Per Lead"] == 0
+        else f'{row["Vehicle Items per $1,000"]:.1f} vehicle items per $1,000'
+    ),
+    axis=1,
+)
+
+roi_ranking["Direct Cost per Closed Policy"] = roi_ranking.apply(
+    lambda row: (
+        "$0 direct lead cost"
+        if row["Cost Per Lead"] == 0
+        else f'${row["Historical Direct Cost per Close"]:,.2f}'
+    ),
+    axis=1,
+)
+
+roi_display = roi_ranking[
+    [
+        "Rank",
+        "Source",
+        "Source Type",
+        "ROI Proxy",
+        "Direct Cost per Closed Policy",
+        "Short Explanation",
+    ]
+]
+
+st.dataframe(
+    roi_display,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Rank": st.column_config.NumberColumn(width="small"),
+        "Source": st.column_config.TextColumn(width="medium"),
+        "Source Type": st.column_config.TextColumn(width="medium"),
+        "ROI Proxy": st.column_config.TextColumn(width="medium"),
+        "Direct Cost per Closed Policy": st.column_config.TextColumn(width="medium"),
+        "Short Explanation": st.column_config.TextColumn(width="large"),
+    },
+)
+
+st.info(
+    "For additional paid-lead spending, the most relevant comparison is among "
+    "EverQuote, Smart Financial, and Insurance Quotes. The other sources may rank "
+    "high historically, but their volume is fixed or naturally limited and cannot "
+    "be increased simply by adding budget."
+)
+
+
 # =====================================================
 # MULTILINE SECTION
 # =====================================================
