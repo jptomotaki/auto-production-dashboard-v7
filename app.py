@@ -1346,9 +1346,9 @@ contribution_table[contribution_number_columns] = contribution_table[
 st.dataframe(contribution_table, use_container_width=True, hide_index=True)
 
 st.caption(
-    "The 121 tracked closed policies include both auto and fire. The model first "
-    "estimates the auto portion using the agency-wide 73% auto share; it does not "
-    "subtract all 121 directly from the 292 auto policies."
+    f"This table shows the expected production for the selected {forecast_months}-month "
+    "forecast. It combines projected production from the six tracked lead sources "
+    "with other agency auto production continuing near its January–June monthly pace."
 )
 
 
@@ -1613,20 +1613,30 @@ st.markdown(
     f"""
 **How other agency auto production is estimated**
 
-The six tracked lead sources produced **{TRACKED_HISTORICAL_POLICIES} total closed policies** from January through June. Those source records combine auto and fire policies, so the model uses the agency's overall historical policy mix to estimate the auto portion.
+### Historical calculation: January through June
 
-The agency produced **{HISTORICAL_AUTO_POLICIES} auto policies out of {HISTORICAL_TOTAL_POLICIES} total policies**, meaning approximately **{AUTO_POLICY_SHARE:.0%} of historical policies were auto**.
+During the **six-month historical period**, the agency produced **{HISTORICAL_AUTO_POLICIES} auto policies**. The six tracked lead sources produced **{TRACKED_HISTORICAL_POLICIES} total closed policies**, but those source records combine auto and fire policies.
 
-1. **Estimated auto policies from the six tracked sources**  
-   {TRACKED_HISTORICAL_POLICIES} × {AUTO_POLICY_SHARE:.0%} = **{ESTIMATED_TRACKED_AUTO_POLICIES:,.1f} estimated auto policies**.
+The model uses the agency's overall historical mix—**{AUTO_POLICY_SHARE:.0%} auto**—to estimate the auto portion of the tracked-source production:
 
-2. **Estimated auto policies from other agency activity**  
-   {HISTORICAL_AUTO_POLICIES} − {ESTIMATED_TRACKED_AUTO_POLICIES:,.1f} = **{OTHER_AGENCY_HISTORICAL_AUTO_POLICIES:,.1f} auto policies** over the six-month historical period.
+1. **Estimated historical auto policies from the six tracked sources**  
+   {TRACKED_HISTORICAL_POLICIES} tracked closed policies × {AUTO_POLICY_SHARE:.0%} auto share = **{ESTIMATED_TRACKED_AUTO_POLICIES:,.1f} estimated auto policies** from January through June.
 
-3. **Monthly pace used in the forecast**  
-   {OTHER_AGENCY_HISTORICAL_AUTO_POLICIES:,.1f} ÷ {HISTORICAL_MONTHS} = approximately **{OTHER_AGENCY_HISTORICAL_AUTO_POLICIES / HISTORICAL_MONTHS:,.1f} other auto policies per month**.
+2. **Estimated historical auto policies from other agency activity**  
+   {HISTORICAL_AUTO_POLICIES} total auto policies − {ESTIMATED_TRACKED_AUTO_POLICIES:,.1f} tracked-source auto policies = **{OTHER_AGENCY_HISTORICAL_AUTO_POLICIES:,.1f} other auto policies** from January through June.
 
-This production represents agency business that was not assigned to one of the six tracked lead sources. The forecast keeps it near its historical monthly pace and models it separately from paid-lead growth. Increasing the paid-lead budget does not automatically increase this portion of production.
+3. **Historical monthly pace for other agency production**  
+   {OTHER_AGENCY_HISTORICAL_AUTO_POLICIES:,.1f} other auto policies ÷ {HISTORICAL_MONTHS} months = approximately **{OTHER_AGENCY_HISTORICAL_AUTO_POLICIES / HISTORICAL_MONTHS:,.1f} other auto policies per month**.
+
+### How it is used in the next {forecast_months}-month forecast
+
+For the selected **{forecast_months}-month forecast**, the model carries that historical monthly pace forward:
+
+{OTHER_AGENCY_HISTORICAL_AUTO_POLICIES / HISTORICAL_MONTHS:,.1f} other auto policies per month × {forecast_months} months = approximately **{(OTHER_AGENCY_HISTORICAL_AUTO_POLICIES / HISTORICAL_MONTHS) * forecast_months:,.1f} other auto policies** during the forecast period.
+
+At an average of **{VEHICLES_PER_AUTO_POLICY:.1f} vehicle items per auto policy**, this equals approximately **{(OTHER_AGENCY_HISTORICAL_AUTO_POLICIES / HISTORICAL_MONTHS) * forecast_months * VEHICLES_PER_AUTO_POLICY:,.1f} vehicle items** during the forecast period.
+
+This “other agency production” represents business not assigned to one of the six tracked lead sources. It is modeled separately and stays near its historical pace. Increasing the paid-lead budget changes only the three adjustable paid sources; it does not automatically increase this portion of production.
 """
 )
 
