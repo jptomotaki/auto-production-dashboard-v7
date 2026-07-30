@@ -757,14 +757,13 @@ def budget_text(value) -> str:
 
 st.title("Auto Production Planning Dashboard")
 st.caption(
-    "Historical inputs use January–June performance. Choose any forecast length "
-    "in months; the model scales the historical pace and source assumptions to "
-    "that period."
+    "Historical inputs use January–June performance. Choose a forecast period, "
+    "vehicle goal, monthly paid-lead budget, and conversion scenario."
 )
 
 st.sidebar.header("Scenario")
 st.sidebar.caption(
-    "Change as many settings as needed, then click Run Forecast once."
+    "Change the settings, then click Run Forecast."
 )
 
 with st.sidebar.form(
@@ -777,10 +776,6 @@ with st.sidebar.form(
             min_value=1,
             value=DEFAULT_FORECAST_MONTHS,
             step=1,
-            help=(
-                "Enter any whole number of months. The model runs only after "
-                "you click Run Forecast."
-            ),
         )
     )
 
@@ -801,14 +796,6 @@ with st.sidebar.form(
         format="%d",
     )
 
-    desired_probability_percent = st.slider(
-        "Desired probability of reaching the goal",
-        min_value=50,
-        max_value=95,
-        value=80,
-        step=5,
-    )
-
     conversion_label = st.selectbox(
         "Conversion scenario",
         options=[
@@ -817,42 +804,24 @@ with st.sidebar.form(
             "Improved: 10% above historical",
         ],
         index=1,
+        help=(
+            "This changes quote-to-close performance only. Historical conversion "
+            "uses the observed January–June rates."
+        ),
     )
-
-    with st.expander("Advanced planning assumptions"):
-        maximum_budget_to_test = st.number_input(
-            "Maximum monthly budget to test",
-            min_value=5_000,
-            max_value=100_000,
-            value=12_000,
-            step=1_000,
-        )
-        apply_capacity_limits = st.checkbox(
-            "Apply paid-provider lead capacity limits",
-            value=False,
-            help=(
-                "Limits each paid provider's total monthly leads to a multiple "
-                "of its historical monthly volume. This is a planning assumption, "
-                "not a confirmed contractual limit."
-            ),
-        )
-        capacity_multiplier = st.slider(
-            "Maximum paid leads versus historical volume",
-            min_value=1.0,
-            max_value=4.0,
-            value=2.0,
-            step=0.25,
-            help=(
-                "This value is used only when paid-provider capacity limits "
-                "are enabled."
-            ),
-        )
 
     st.form_submit_button(
         "Run Forecast",
         use_container_width=True,
         type="primary",
     )
+
+# Keep the interface simple while preserving an 80% confidence reference.
+desired_probability_percent = 80
+desired_probability = 0.80
+maximum_budget_to_test = 12_000
+apply_capacity_limits = False
+capacity_multiplier = 2.0
 
 forecast_period_label = (
     "1-month forecast"
@@ -863,7 +832,6 @@ selected_month_numbers = list(range(1, forecast_months + 1))
 historical_pace_forecast = (
     HISTORICAL_MONTHLY_VEHICLE_PACE * forecast_months
 )
-desired_probability = desired_probability_percent / 100
 
 conversion_multiplier_lookup = {
     "Conservative: 10% below historical": 0.90,
@@ -911,14 +879,12 @@ with st.spinner("Comparing budget levels..."):
 
 vehicle_results = selected_simulation["vehicle_items"]
 auto_results = selected_simulation["auto_policies"]
-multiline_results = selected_simulation["multiline_fire_attachments"]
 monthly_vehicle_results = selected_simulation["vehicle_items_monthly"]
 source_plan = selected_simulation["source_plan"]
 source_summary = selected_simulation["source_summary"]
 
 expected_vehicle_items = float(vehicle_results.mean())
 expected_auto_policies = float(auto_results.mean())
-expected_multiline_fire = float(multiline_results.mean())
 vehicle_goal_probability = float(np.mean(vehicle_results >= vehicle_goal))
 
 baseline_expected_vehicles = float(
@@ -957,7 +923,7 @@ st.caption(
 # TOP KPI ROW
 # =====================================================
 
-k1, k2, k3, k4 = st.columns(4)
+k1, k2, k3 = st.columns(3)
 k1.metric(
     "Expected Vehicle Items",
     f"{expected_vehicle_items:,.1f}",
@@ -971,11 +937,6 @@ k3.metric(
     "Expected Auto Policies",
     f"{expected_auto_policies:,.1f}",
 )
-k4.metric(
-    "Expected Multiline Attachments",
-    f"{expected_multiline_fire:,.1f}",
-    help="Estimated as 45% of auto policies. It does not set the budget.",
-)
 
 
 # =====================================================
@@ -986,26 +947,26 @@ st.subheader("Insight Summary")
 
 if selected_probability_budget is None:
     recommendation_text = (
-        f"The selected {desired_probability_percent}% confidence level was not "
-        f"reached within the tested budget range."
+        "The model did not reach the fixed 80% confidence reference within the "
+        "tested budget range."
     )
 elif selected_probability_budget > BASELINE_MONTHLY_BUDGET:
     recommendation_text = (
-        f"The lowest tested budget reaching {desired_probability_percent}% "
-        f"confidence is approximately ${selected_probability_budget:,.0f} per month."
+        f"The lowest tested budget reaching the fixed 80% confidence reference "
+        f"is approximately ${selected_probability_budget:,.0f} per month."
     )
 else:
     recommendation_text = (
         f"The established ${BASELINE_MONTHLY_BUDGET:,.0f} monthly budget reaches "
-        f"the selected confidence level in the model."
+        "the 80% confidence reference in the model."
     )
 
 st.markdown(
     f"""
 - **Forecast:** {expected_vehicle_items:,.0f} vehicle items over {forecast_months} month{'s' if forecast_months != 1 else ''}.
-- **Goal comparison:** {summary_difference:,.0f} {summary_direction} the {vehicle_goal:,}-vehicle goal, with a {vehicle_goal_probability:.0%} modeled probability of reaching it.
+- **Goal comparison:** {summary_difference:,.0f} {summary_direction} the {vehicle_goal:,}-vehicle goal.
+- **Chance of reaching the goal:** {vehicle_goal_probability:.0%} of the 10,000 simulated outcomes reached or exceeded the goal.
 - **Budget guidance:** {recommendation_text}
-- **Multiline estimate:** {expected_multiline_fire:,.0f} expected fire attachments using the {MULTILINE_FIRE_ATTACHMENT_RATE:.0%} attachment assumption; this does not drive the budget recommendation.
 """
 )
 
@@ -1173,9 +1134,8 @@ else:
         )
 
     st.caption(
-        "This recommendation targets the average modeled outcome, not the "
-        "selected confidence level. Use the probability-based budget scenario "
-        "when a larger safety margin is required."
+        "This recommendation targets the average modeled outcome. The fixed 80% "
+        "confidence budget shown below includes a larger safety margin."
     )
 
 
@@ -1233,16 +1193,12 @@ expected_curve_row = curve_row_for_budget(
     probability_curve,
     expected_goal_budget,
 )
-fifty_curve_row = curve_row_for_budget(
-    probability_curve,
-    fifty_percent_budget,
-)
-selected_curve_row = curve_row_for_budget(
+eighty_curve_row = curve_row_for_budget(
     probability_curve,
     selected_probability_budget,
 )
 
-s1, s2, s3, s4 = st.columns(4)
+s1, s2, s3 = st.columns(3)
 
 with s1:
     st.metric("Established Budget", f"${BASELINE_MONTHLY_BUDGET:,.0f}/month")
@@ -1253,7 +1209,7 @@ with s1:
         )
 
 with s2:
-    st.metric("Expected Result Reaches Goal", budget_text(expected_goal_budget))
+    st.metric("Average Forecast Reaches Goal", budget_text(expected_goal_budget))
     if expected_curve_row is not None:
         st.caption(
             f"Expected: {expected_curve_row['Expected Vehicle Items']:.0f} vehicles  •  "
@@ -1261,28 +1217,17 @@ with s2:
         )
 
 with s3:
-    st.metric("50% Goal Probability", budget_text(fifty_percent_budget))
-    if fifty_curve_row is not None:
+    st.metric("80% Goal Probability", budget_text(selected_probability_budget))
+    if eighty_curve_row is not None:
         st.caption(
-            f"Expected: {fifty_curve_row['Expected Vehicle Items']:.0f} vehicles  •  "
-            f"Goal probability: {fifty_curve_row['Vehicle Goal Probability']:.0%}"
-        )
-
-with s4:
-    st.metric(
-        f"{desired_probability_percent}% Goal Probability",
-        budget_text(selected_probability_budget),
-    )
-    if selected_curve_row is not None:
-        st.caption(
-            f"Expected: {selected_curve_row['Expected Vehicle Items']:.0f} vehicles  •  "
-            f"Goal probability: {selected_curve_row['Vehicle Goal Probability']:.0%}"
+            f"Expected: {eighty_curve_row['Expected Vehicle Items']:.0f} vehicles  •  "
+            f"Goal probability: {eighty_curve_row['Vehicle Goal Probability']:.0%}"
         )
 
 st.caption(
-    f"The expected-result budget targets an average of {vehicle_goal:,} vehicle items. "
-    "The probability budgets add progressively more protection against "
-    "weaker-than-average outcomes."
+    "The average-result budget is the first tested budget where mean production "
+    "reaches the goal. The 80% budget is higher because it must cover many "
+    "weaker-than-average outcomes, not only the average outcome."
 )
 
 
@@ -1290,162 +1235,79 @@ st.caption(
 # MONTE CARLO OUTCOME DISTRIBUTION
 # =====================================================
 
-st.subheader("Monte Carlo Outcome Distribution")
+st.subheader("All 10,000 Monte Carlo Outcomes")
 
-# Group the 10,000 simulated total-vehicle outcomes into readable ranges.
-# This is a histogram: each bar shows how many simulations landed within
-# that vehicle-item range.
-histogram_counts, histogram_edges = np.histogram(
-    vehicle_results,
-    bins=36,
+# A regular frequency bar chart: one bar for each exact vehicle total.
+# The height of the bar is the number of simulations that produced that total.
+outcome_frequency = (
+    pd.Series(vehicle_results.astype(int), name="Vehicle Items")
+    .value_counts()
+    .sort_index()
+    .rename_axis("Vehicle Items")
+    .reset_index(name="Number of Simulations")
 )
-
-outcome_distribution = pd.DataFrame(
-    {
-        "Range Start": histogram_edges[:-1],
-        "Range End": histogram_edges[1:],
-        "Simulated Outcomes": histogram_counts,
-    }
+outcome_frequency["Share of Outcomes"] = (
+    outcome_frequency["Number of Simulations"] / len(vehicle_results)
 )
-outcome_distribution["Outcome Share"] = (
-    outcome_distribution["Simulated Outcomes"] / len(vehicle_results)
-)
-outcome_distribution["Range Midpoint"] = (
-    outcome_distribution["Range Start"]
-    + outcome_distribution["Range End"]
-) / 2
 
 outcome_bars = (
-    alt.Chart(outcome_distribution)
-    .mark_bar(
-        opacity=0.88,
-        cornerRadiusTopLeft=3,
-        cornerRadiusTopRight=3,
-    )
+    alt.Chart(outcome_frequency)
+    .mark_bar(color="#2563EB", opacity=0.88, size=5)
     .encode(
         x=alt.X(
-            "Range Start:Q",
-            bin="binned",
-            title=(
-                f"Total vehicle items across the {forecast_months}-month forecast"
-            ),
+            "Vehicle Items:Q",
+            title=f"Total vehicle items over {forecast_months} months",
+            axis=alt.Axis(format="d", tickCount=12),
+            scale=alt.Scale(zero=False),
         ),
-        x2=alt.X2("Range End:Q"),
         y=alt.Y(
-            "Simulated Outcomes:Q",
-            title="Number of simulated outcomes",
-        ),
-        color=alt.condition(
-            f"datum['Range Midpoint'] >= {float(vehicle_goal)}",
-            alt.value("#16A34A"),
-            alt.value("#2563EB"),
+            "Number of Simulations:Q",
+            title="Number of simulations",
         ),
         tooltip=[
-            alt.Tooltip("Range Start:Q", title="Range begins", format=".0f"),
-            alt.Tooltip("Range End:Q", title="Range ends", format=".0f"),
+            alt.Tooltip("Vehicle Items:Q", title="Exact vehicle total", format=".0f"),
             alt.Tooltip(
-                "Simulated Outcomes:Q",
-                title="Simulations",
+                "Number of Simulations:Q",
+                title="Simulations with this result",
                 format=",.0f",
             ),
             alt.Tooltip(
-                "Outcome Share:Q",
-                title="Share of outcomes",
+                "Share of Outcomes:Q",
+                title="Share of all outcomes",
                 format=".1%",
             ),
         ],
     )
 )
 
-expected_rule = (
-    alt.Chart(
-        pd.DataFrame(
-            {"Expected Vehicle Items": [expected_vehicle_items]}
-        )
-    )
-    .mark_rule(
-        color="#111827",
-        strokeWidth=2.5,
-        strokeDash=[7, 5],
-    )
-    .encode(x=alt.X("Expected Vehicle Items:Q"))
-)
-
-expected_label = (
-    alt.Chart(
-        pd.DataFrame(
-            {
-                "Expected Vehicle Items": [expected_vehicle_items],
-                "Label": [f"Average: {expected_vehicle_items:,.1f}"],
-            }
-        )
-    )
-    .mark_text(
-        align="left",
-        baseline="top",
-        dx=6,
-        dy=7,
-        color="#111827",
-        fontWeight="bold",
-    )
-    .encode(
-        x=alt.X("Expected Vehicle Items:Q"),
-        y=alt.value(0),
-        text="Label:N",
-    )
+average_rule = (
+    alt.Chart(pd.DataFrame({"Average": [expected_vehicle_items]}))
+    .mark_rule(color="#111827", strokeWidth=2, strokeDash=[6, 4])
+    .encode(x="Average:Q")
 )
 
 goal_rule = (
-    alt.Chart(pd.DataFrame({"Vehicle Goal": [float(vehicle_goal)]}))
+    alt.Chart(pd.DataFrame({"Goal": [float(vehicle_goal)]}))
     .mark_rule(color="#DC2626", strokeWidth=3)
-    .encode(x=alt.X("Vehicle Goal:Q"))
+    .encode(x="Goal:Q")
 )
 
-goal_label = (
-    alt.Chart(
-        pd.DataFrame(
-            {
-                "Vehicle Goal": [float(vehicle_goal)],
-                "Label": [f"Goal: {vehicle_goal:,.0f}"],
-            }
-        )
-    )
-    .mark_text(
-        align="left",
-        baseline="top",
-        dx=6,
-        dy=26,
-        color="#DC2626",
-        fontWeight="bold",
-    )
-    .encode(
-        x=alt.X("Vehicle Goal:Q"),
-        y=alt.value(0),
-        text="Label:N",
-    )
+st.altair_chart(
+    (outcome_bars + average_rule + goal_rule).properties(height=360),
+    use_container_width=True,
 )
-
-outcome_chart = (
-    outcome_bars
-    + expected_rule
-    + expected_label
-    + goal_rule
-    + goal_label
-).properties(height=360)
-
-st.altair_chart(outcome_chart, use_container_width=True)
 
 percentile_10 = float(np.percentile(vehicle_results, 10))
 median_outcome = float(np.percentile(vehicle_results, 50))
 percentile_90 = float(np.percentile(vehicle_results, 90))
 
 st.caption(
-    f"Each bar groups similar results from all {len(vehicle_results):,} Monte Carlo "
-    f"simulations. Blue bars fall below the {vehicle_goal:,.0f}-vehicle goal; "
-    "green bars meet or exceed it. The dashed line marks the average forecast, "
-    f"and the red line marks the goal. The middle 80% of outcomes range from "
-    f"approximately {percentile_10:,.0f} to {percentile_90:,.0f} vehicles, with "
-    f"a median of {median_outcome:,.0f}."
+    f"Every one of the {len(vehicle_results):,} simulations is included. Each blue "
+    "bar represents one exact vehicle total, and the bar height shows how many "
+    "simulations produced that result. The dashed black line is the average "
+    f"({expected_vehicle_items:,.1f}); the red line is the goal ({vehicle_goal:,.0f}). "
+    f"The middle 80% of outcomes fall between about {percentile_10:,.0f} and "
+    f"{percentile_90:,.0f} vehicles, with a median of {median_outcome:,.0f}."
 )
 
 
@@ -1472,22 +1334,22 @@ contribution_table = pd.DataFrame(
             selected_simulation["other_agency_vehicle_items"].mean(),
             vehicle_results.mean(),
         ],
-        "Expected Multiline Attachments": [
-            selected_simulation["tracked_multiline_fire"].mean(),
-            selected_simulation["other_agency_multiline_fire"].mean(),
-            multiline_results.mean(),
-        ],
     }
 )
 contribution_number_columns = [
     "Expected Auto Policies",
     "Expected Vehicle Items",
-    "Expected Multiline Attachments",
 ]
 contribution_table[contribution_number_columns] = contribution_table[
     contribution_number_columns
 ].round(1)
 st.dataframe(contribution_table, use_container_width=True, hide_index=True)
+
+st.caption(
+    "The 121 tracked closed policies include both auto and fire. The model first "
+    "estimates the auto portion using the agency-wide 73% auto share; it does not "
+    "subtract all 121 directly from the 292 auto policies."
+)
 
 
 # =====================================================
@@ -1573,22 +1435,7 @@ else:
 # MULTILINE SECTION
 # =====================================================
 
-st.subheader("Multiline Opportunity")
 
-m1, m2, m3 = st.columns(3)
-m1.metric("Expected Auto Policies", f"{expected_auto_policies:,.1f}")
-m2.metric(
-    "Multiline Attachment Assumption",
-    f"{MULTILINE_FIRE_ATTACHMENT_RATE:.0%}",
-)
-m3.metric(
-    "Expected Fire Attachments",
-    f"{expected_multiline_fire:,.1f}",
-)
-st.caption(
-    "Multiline fire attachments are estimated from auto production and are not used "
-    "to increase the budget recommendation."
-)
 
 
 # =====================================================
@@ -1652,12 +1499,12 @@ with chart_col2:
                 alt.Tooltip("Goal Probability (%):Q", title="Goal probability", format=".1f"),
             ],
         )
-        .properties(title="Goal probability by budget", height=320)
+        .properties(title="Goal probability by budget (80% reference)", height=320)
     )
     probability_rule = (
         alt.Chart(
             pd.DataFrame(
-                {"Selected Probability": [desired_probability_percent]}
+                {"Selected Probability": [80]}
             )
         )
         .mark_rule(color="#6B7280", strokeDash=[7, 5])
@@ -1667,6 +1514,118 @@ with chart_col2:
         probability_chart + probability_rule,
         use_container_width=True,
     )
+
+
+
+# =====================================================
+# DATA USED IN THE MODEL
+# =====================================================
+
+st.subheader("Data Used in the Model")
+
+baseline_data = pd.DataFrame(
+    {
+        "Historical Input": [
+            "Auto policies, January–June",
+            "Fire policies, January–June",
+            "Total policies, January–June",
+            "Vehicle items per auto policy",
+            "Estimated vehicle items, January–June",
+            "Historical vehicle pace",
+            "Established monthly paid-lead budget",
+        ],
+        "Value": [
+            f"{HISTORICAL_AUTO_POLICIES:,}",
+            f"{HISTORICAL_FIRE_POLICIES:,}",
+            f"{HISTORICAL_TOTAL_POLICIES:,}",
+            f"{VEHICLES_PER_AUTO_POLICY:.1f}",
+            f"{HISTORICAL_VEHICLE_ITEMS:,.0f}",
+            f"{HISTORICAL_MONTHLY_VEHICLE_PACE:.1f} vehicles per month",
+            f"${BASELINE_MONTHLY_BUDGET:,.0f} per month",
+        ],
+    }
+)
+st.dataframe(baseline_data, use_container_width=True, hide_index=True)
+
+source_data_display = sources[
+    [
+        "Source",
+        "Historical Leads",
+        "Average Monthly Leads",
+        "Historical Quotes",
+        "Closed Policies",
+        "Quote Rate",
+        "Quote-to-Close Rate",
+        "Lead-to-Close Rate",
+        "Cost Per Lead",
+    ]
+].copy()
+source_data_display.insert(
+    1,
+    "Source Type",
+    [
+        "Adjustable paid",
+        "Adjustable paid",
+        "Adjustable paid",
+        "Fixed",
+        "Natural",
+        "Natural",
+    ],
+)
+source_data_display["Estimated Monthly Source Cost"] = (
+    sources["Historical Source Cost"] / HISTORICAL_MONTHS
+)
+source_data_display["Budget Treatment"] = [
+    "Additional budget can be allocated",
+    "Additional budget can be allocated",
+    "Additional budget can be allocated",
+    "Held at 70 leads per month",
+    "Held at historical pace",
+    "Held at historical pace",
+]
+
+for column in ["Quote Rate", "Quote-to-Close Rate", "Lead-to-Close Rate"]:
+    source_data_display[column] = (source_data_display[column] * 100).round(2)
+source_data_display["Average Monthly Leads"] = source_data_display[
+    "Average Monthly Leads"
+].round(2)
+source_data_display["Cost Per Lead"] = source_data_display[
+    "Cost Per Lead"
+].round(2)
+source_data_display["Estimated Monthly Source Cost"] = source_data_display[
+    "Estimated Monthly Source Cost"
+].round(2)
+source_data_display = source_data_display.rename(
+    columns={
+        "Historical Leads": "6-Month Leads",
+        "Average Monthly Leads": "Leads per Month",
+        "Historical Quotes": "Quotes",
+        "Quote Rate": "Quote Rate (%)",
+        "Quote-to-Close Rate": "Quote-to-Close Rate (%)",
+        "Lead-to-Close Rate": "Lead-to-Close Rate (%)",
+        "Cost Per Lead": "Cost per Lead ($)",
+        "Estimated Monthly Source Cost": "Estimated Monthly Source Cost ($)",
+    }
+)
+st.dataframe(source_data_display, use_container_width=True, hide_index=True)
+
+st.info(
+    "Data check: Insurance Quotes is modeled with 37 historical leads. That is the "
+    "value consistent with 6.17 leads per month and a 31/37 = 83.78% quote rate. "
+    "Using 47 leads would conflict with both of those figures."
+)
+
+st.markdown(
+    f"""
+**How the untracked auto production is calculated**
+
+The six tracked sources produced **{TRACKED_HISTORICAL_POLICIES} total closed policies**, but those records do not identify which were auto and which were fire. Therefore, the model cannot subtract 121 directly from the 292 auto policies.
+
+1. Estimated tracked auto policies: {TRACKED_HISTORICAL_POLICIES} × {AUTO_POLICY_SHARE:.0%} = **{ESTIMATED_TRACKED_AUTO_POLICIES:,.1f}**.
+2. Estimated other agency auto policies: {HISTORICAL_AUTO_POLICIES} − {ESTIMATED_TRACKED_AUTO_POLICIES:,.1f} = **{OTHER_AGENCY_HISTORICAL_AUTO_POLICIES:,.1f}** over six months.
+3. This other production is held near its historical monthly pace in the forecast.
+"""
+)
 
 
 # =====================================================
@@ -1696,22 +1655,29 @@ with st.expander("Source-level forecast and historical performance"):
     st.dataframe(source_plan_display, use_container_width=True, hide_index=True)
 
     st.write("**Tracked-source production forecast**")
-    source_forecast_display = source_summary.copy()
-    source_forecast_number_columns = [
+    source_forecast_display = source_summary[
+        [
+            "Source",
+            "Category",
+            "Expected Leads",
+            "Expected Quotes",
+            "Expected Closed Policies",
+            "Expected Auto Policies",
+            "Expected Vehicle Items",
+            "Incremental Forecast-Period Cost",
+        ]
+    ].copy()
+    number_columns = [
         "Expected Leads",
         "Expected Quotes",
         "Expected Closed Policies",
         "Expected Auto Policies",
         "Expected Vehicle Items",
-        "Expected Multiline Fire Attachments",
-        "10th Percentile Vehicle Items",
-        "Median Vehicle Items",
-        "90th Percentile Vehicle Items",
         "Incremental Forecast-Period Cost",
     ]
-    source_forecast_display[source_forecast_number_columns] = (
-        source_forecast_display[source_forecast_number_columns].round(1)
-    )
+    source_forecast_display[number_columns] = source_forecast_display[
+        number_columns
+    ].round(1)
     st.dataframe(
         source_forecast_display,
         use_container_width=True,
@@ -1727,11 +1693,9 @@ with st.expander("Source-level forecast and historical performance"):
             "Historical Quotes",
             "Closed Policies",
             "Cost Per Lead",
-            "Assignment Hours",
             "Quote Rate",
             "Quote-to-Close Rate",
             "Lead-to-Close Rate",
-            "Historical Cost Per Close",
         ]
     ].copy()
     for rate_column in [
@@ -1742,98 +1706,88 @@ with st.expander("Source-level forecast and historical performance"):
         historical_display[rate_column] = (
             historical_display[rate_column] * 100
         ).round(1)
-    historical_display["Historical Cost Per Close"] = historical_display[
-        "Historical Cost Per Close"
-    ].round(2)
     historical_display = historical_display.rename(
         columns={
             "Cost Per Lead": "Cost Per Lead ($)",
-            "Assignment Hours": "Average Assignment Hours",
             "Quote Rate": "Quote Rate (%)",
             "Quote-to-Close Rate": "Quote-to-Close Rate (%)",
             "Lead-to-Close Rate": "Lead-to-Close Rate (%)",
-            "Historical Cost Per Close": "Historical Cost Per Close ($)",
         }
     )
     st.dataframe(historical_display, use_container_width=True, hide_index=True)
-
 
 
 # =====================================================
 # ASSUMPTIONS AND LIMITATIONS
 # =====================================================
 
-with st.expander("Model assumptions and limitations"):
+with st.expander("Model assumptions and limitations", expanded=True):
     st.markdown(
         f"""
         <div class="assumption-box">
-            <strong>Baseline calibration:</strong> The agency was already spending
-            ${BASELINE_MONTHLY_BUDGET:,.0f} per month during the historical period.
-            The model therefore anchors that budget to observed historical production.
+            <strong>What the model is doing:</strong> It uses six months of agency
+            performance to create 10,000 possible future outcomes. The results are
+            planning estimates, not promises.
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    assumption_table = pd.DataFrame(
+    simple_assumptions = pd.DataFrame(
         {
-            "Assumption": [
+            "Model Input": [
+                "Historical period",
                 "Historical vehicle pace",
-                "Selected-period historical-pace forecast",
                 "Vehicle items per auto policy",
-                "Tracked-source auto share",
-                "StateFarm.com monthly planning volume",
-                "Multiline attachment rate",
-                "Conversion scenario",
-                "Paid-provider capacity assumption",
+                "Estimated auto share of closed policies",
+                "StateFarm monthly planning volume",
+                "Paid sources that can receive extra budget",
+                "Confidence reference shown in the app",
             ],
             "Value": [
-                f"{HISTORICAL_MONTHLY_VEHICLE_PACE:.1f} per month",
-                f"{historical_pace_forecast:.1f}",
+                "January–June (6 months)",
+                f"{HISTORICAL_MONTHLY_VEHICLE_PACE:.1f} vehicles per month",
                 f"{VEHICLES_PER_AUTO_POLICY:.1f}",
-                f"{AUTO_POLICY_SHARE:.1%}",
-                f"{STATEFARM_MONTHLY_LEADS} leads",
-                f"{MULTILINE_FIRE_ATTACHMENT_RATE:.0%}",
-                conversion_label,
-                (
-                    f"Maximum {capacity_multiplier:.2f}× historical paid volume"
-                    if apply_capacity_limits
-                    else "Not applied"
-                ),
+                f"{AUTO_POLICY_SHARE:.0%}",
+                f"{STATEFARM_MONTHLY_LEADS} leads per month",
+                "EverQuote, Smart Financial, and Insurance Quotes",
+                "80%",
             ],
         }
     )
-    st.dataframe(assumption_table, use_container_width=True, hide_index=True)
+    st.dataframe(simple_assumptions, use_container_width=True, hide_index=True)
 
-    st.write(
-        f"The provider-level records explain approximately "
-        f"**${PAID_PROVIDER_RECORDED_MONTHLY_COST:,.0f} per month** of the established "
-        f"$3,600 budget. Approximately **${UNMAPPED_MONTHLY_BUDGET:,.0f} per month** "
-        "is not mapped to the three paid-provider CPL records. The model therefore "
-        "uses CPL only for incremental spending above the baseline."
+    st.markdown(
+        f"""
+### Limitations in plain language
+
+**Only six months of history are available.**  
+The model assumes January–June is a reasonable guide to the future. Seasonality, staffing changes, market conditions, or changes in customer demand could make later months different.
+
+**The source records do not identify auto versus fire.**  
+The 121 tracked closed policies include both policy types. The model estimates that {AUTO_POLICY_SHARE:.0%} are auto because {HISTORICAL_AUTO_POLICIES} of the agency's {HISTORICAL_TOTAL_POLICIES} total policies were auto.
+
+**Not all agency production is tied to the six tracked sources.**  
+The six tracked sources produced 121 total policies, while the agency produced {HISTORICAL_TOTAL_POLICIES} total policies. The remaining production is represented as “other agency production” and is assumed to continue near its historical pace.
+
+**The full $3,600 baseline budget is not mapped to provider records.**  
+The three adjustable paid sources explain about **${PAID_PROVIDER_RECORDED_MONTHLY_COST:,.0f} per month** from their recorded lead counts and costs. About **${UNMAPPED_MONTHLY_BUDGET:,.0f} per month** is not assigned to those three records. For that reason, the model treats $3,600 as the established baseline and uses cost per lead only for spending above it.
+
+**Only three sources grow when the budget grows.**  
+Additional spending purchases leads only from EverQuote, Smart Financial, and Insurance Quotes. StateFarm, referrals, winbacks, and other agency production remain at their fixed or historical pace.
+
+**The base model assumes additional paid leads are available.**  
+No confirmed provider maximums were supplied. In reality, a provider may have volume limits, price changes, or lower lead quality when more leads are purchased.
+
+**Historical conversion may not continue.**  
+The same provider can perform differently in future months. More purchased leads may not convert at the same rate as the original leads.
+
+**A probability is not a guarantee.**  
+An 80% result still means about 20% of simulated outcomes miss the goal. The simulation is meant to compare risk, not eliminate it.
+"""
     )
-    st.write(
-        "The six tracked sources do not contain source-specific auto/fire splits. "
-        "Their auto production is estimated using the agency-wide historical auto "
-        "share of 73%."
-    )
-    st.write(
-        "Additional paid spending affects only EverQuote, Smart Financial, and "
-        "Insurance Quotes. Other agency production, StateFarm.com, referrals, and "
-        "winbacks remain at their planning or historical monthly volumes."
-    )
-    st.write(
-        "Provider capacity limits are planning assumptions because confirmed monthly "
-        "maximums were not available. Adjust or disable them in the sidebar."
-    )
-    st.write(
-        "The conversion scenarios adjust quote-to-close performance by 10% below, "
-        "equal to, or 10% above the historical level."
-    )
-    st.write(
-        "Assignment time is displayed for operational context but does not change "
-        "conversion because the aggregate data does not establish causation."
-    )
+
     st.warning(
-        "This dashboard is a planning model, not a guarantee of future production."
+        "Use the dashboard as a planning aid alongside vendor capacity, staffing, "
+        "lead quality, and management judgment."
     )
