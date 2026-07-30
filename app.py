@@ -1609,12 +1609,6 @@ source_data_display = source_data_display.rename(
 )
 st.dataframe(source_data_display, use_container_width=True, hide_index=True)
 
-st.info(
-    "Data check: Insurance Quotes is modeled with 37 historical leads. That is the "
-    "value consistent with 6.17 leads per month and a 31/37 = 83.78% quote rate. "
-    "Using 47 leads would conflict with both of those figures."
-)
-
 st.markdown(
     f"""
 **How the untracked auto production is calculated**
