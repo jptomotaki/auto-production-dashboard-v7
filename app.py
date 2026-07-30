@@ -1364,10 +1364,11 @@ extra_selected_budget = max(
 )
 
 if selected_monthly_budget > BASELINE_MONTHLY_BUDGET:
-    st.write(
-        f"The first **${BASELINE_MONTHLY_BUDGET:,.0f} per month** maintains the "
-        f"historical baseline. The additional **${extra_selected_budget:,.0f} per month** "
-        "is allocated below."
+    st.markdown(
+        f"The first <strong>&#36;{BASELINE_MONTHLY_BUDGET:,.0f} per month</strong> maintains the "
+        f"historical baseline. The additional <strong>&#36;{extra_selected_budget:,.0f} per month</strong> "
+        "is allocated below.",
+        unsafe_allow_html=True,
     )
 
     allocation_display, allocation_unspent = calculate_incremental_allocation(
