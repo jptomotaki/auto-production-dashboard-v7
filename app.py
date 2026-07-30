@@ -1611,13 +1611,22 @@ st.dataframe(source_data_display, use_container_width=True, hide_index=True)
 
 st.markdown(
     f"""
-**How the untracked auto production is calculated**
+**How other agency auto production is estimated**
 
-The six tracked sources produced **{TRACKED_HISTORICAL_POLICIES} total closed policies**, but those records do not identify which were auto and which were fire. Therefore, the model cannot subtract 121 directly from the 292 auto policies.
+The six tracked lead sources produced **{TRACKED_HISTORICAL_POLICIES} total closed policies** from January through June. Those source records combine auto and fire policies, so the model uses the agency's overall historical policy mix to estimate the auto portion.
 
-1. Estimated tracked auto policies: {TRACKED_HISTORICAL_POLICIES} × {AUTO_POLICY_SHARE:.0%} = **{ESTIMATED_TRACKED_AUTO_POLICIES:,.1f}**.
-2. Estimated other agency auto policies: {HISTORICAL_AUTO_POLICIES} − {ESTIMATED_TRACKED_AUTO_POLICIES:,.1f} = **{OTHER_AGENCY_HISTORICAL_AUTO_POLICIES:,.1f}** over six months.
-3. This other production is held near its historical monthly pace in the forecast.
+The agency produced **{HISTORICAL_AUTO_POLICIES} auto policies out of {HISTORICAL_TOTAL_POLICIES} total policies**, meaning approximately **{AUTO_POLICY_SHARE:.0%} of historical policies were auto**.
+
+1. **Estimated auto policies from the six tracked sources**  
+   {TRACKED_HISTORICAL_POLICIES} × {AUTO_POLICY_SHARE:.0%} = **{ESTIMATED_TRACKED_AUTO_POLICIES:,.1f} estimated auto policies**.
+
+2. **Estimated auto policies from other agency activity**  
+   {HISTORICAL_AUTO_POLICIES} − {ESTIMATED_TRACKED_AUTO_POLICIES:,.1f} = **{OTHER_AGENCY_HISTORICAL_AUTO_POLICIES:,.1f} auto policies** over the six-month historical period.
+
+3. **Monthly pace used in the forecast**  
+   {OTHER_AGENCY_HISTORICAL_AUTO_POLICIES:,.1f} ÷ {HISTORICAL_MONTHS} = approximately **{OTHER_AGENCY_HISTORICAL_AUTO_POLICIES / HISTORICAL_MONTHS:,.1f} other auto policies per month**.
+
+This production represents agency business that was not assigned to one of the six tracked lead sources. The forecast keeps it near its historical monthly pace and models it separately from paid-lead growth. Increasing the paid-lead budget does not automatically increase this portion of production.
 """
 )
 
